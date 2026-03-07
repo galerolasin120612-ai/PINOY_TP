@@ -6,7 +6,7 @@ repeat task.wait() until game:IsLoaded()
 -- ============================================================
 local WHITELIST = {
     "LENILENIHAHAHAHA",   -- palitan ng username mo
-    "Friend1",        -- dagdag pa kung gusto mo
+    "RONALDSSS9",        -- dagdag pa kung gusto mo
     "Friend2",
 }
 
