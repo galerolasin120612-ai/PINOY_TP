@@ -203,8 +203,8 @@ local function startTaunt()
             pcall(function()
                 local TCS=game:GetService("TextChatService")
                 local ch=TCS.TextChannels:FindFirstChild("RBXGeneral")
-                if ch then ch:SendAsync("/lol Eclipse Better 😂😂")
-                else game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents",1):WaitForChild("SayMessageRequest",1):FireServer("/lol Eclipse Better 😂😂","All") end
+                if ch then ch:SendAsync("/Nexus On tops")
+                else game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents",1):WaitForChild("SayMessageRequest",1):FireServer("/Nexus On tops","All") end
             end)
             task.wait(0.5)
         end
