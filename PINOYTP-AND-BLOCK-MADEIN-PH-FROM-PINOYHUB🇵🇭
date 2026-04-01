@@ -51,6 +51,7 @@ changingKeybind=nil
 SavedToggleStates={}
 openButtonPosSaved=nil
 mobilePosSaved={}
+currentUISize=100
 
 -- Ragdoll TP (Nightmare version)
 local tpWasRagdolled=false local tpCooldown=false
@@ -99,10 +100,10 @@ local function saveConfig()
                 GALAXY_GRAVITY=GALAXY_GRAVITY,GALAXY_HOP=GALAXY_HOP,
                 SPIN_SPEED=SPIN_SPEED,fovValue=fovValue,
                 AIMBOT_SPEED=AIMBOT_SPEED,BAT_ENGAGE_RANGE=BAT_ENGAGE_RANGE,
+                UISize = currentUISize,
                 OpenButtonPosition = {X = OBtn and OBtn.Position.X.Offset or 10, Y = OBtn and OBtn.Position.Y.Offset or -26},
                 MobileButtonPositions = {}
             }
-            -- I-save mobile button positions
             for i, btn in ipairs(mobileButtons) do
                 table.insert(data.MobileButtonPositions, {
                     X = btn.Position.X.Offset,
@@ -131,6 +132,7 @@ local function loadConfig()
                 if data.fovValue then fovValue=data.fovValue end
                 if data.AIMBOT_SPEED then AIMBOT_SPEED=data.AIMBOT_SPEED end
                 if data.BAT_ENGAGE_RANGE then BAT_ENGAGE_RANGE=data.BAT_ENGAGE_RANGE end
+                if data.UISize then currentUISize=data.UISize end
                 if data.OpenButtonPosition then openButtonPosSaved=data.OpenButtonPosition end
                 if data.MobileButtonPositions then mobilePosSaved=data.MobileButtonPositions end
                 for k,_ in pairs(Keybinds) do
@@ -830,8 +832,18 @@ ScreenGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling ScreenGui.IgnoreGuiInset=fa
 ScreenGui.Parent=player:WaitForChild("PlayerGui")
 
 local MainFrame=Instance.new("Frame")
-MainFrame.Name="MainFrame" MainFrame.Size=UDim2.new(0,360,0,580)
-MainFrame.Position=UDim2.new(0.5,-180,0.5,-290) MainFrame.BackgroundColor3=BG
+MainFrame.Name="MainFrame" 
+local BASE_W,BASE_H=360,580
+local function updateUISize(percent)
+    percent = math.clamp(percent, 40, 200)
+    currentUISize = percent
+    local w = math.floor(BASE_W * (percent / 100))
+    local h = math.floor(BASE_H * (percent / 100))
+    MainFrame.Size = UDim2.new(0, w, 0, h)
+    MainFrame.Position = UDim2.new(0.5, -w/2, 0.5, -h/2)
+end
+updateUISize(currentUISize)
+MainFrame.BackgroundColor3=BG
 MainFrame.BorderSizePixel=0 MainFrame.Active=true MainFrame.Visible=false MainFrame.Parent=ScreenGui
 MainFrame.BackgroundTransparency=0.35
 Instance.new("UICorner",MainFrame).CornerRadius=UDim.new(0,16)
@@ -869,7 +881,7 @@ TitleLbl.Font=Enum.Font.GothamBlack TitleLbl.TextSize=22 TitleLbl.TextColor3=WHI
 TitleLbl.TextStrokeColor3=ACCENT TitleLbl.TextStrokeTransparency=0.5
 
 do
-    local guiScale=1.0 local BASE_W,BASE_H=360,580
+    local guiScale=1.0 
     local plusBtn=Instance.new("TextButton",TitleBar)
     plusBtn.Size=UDim2.new(0,26,0,26) plusBtn.Position=UDim2.new(1,-58,0.5,-13)
     plusBtn.BackgroundColor3=Color3.fromRGB(30,20,50) plusBtn.Text="+"
@@ -1092,24 +1104,103 @@ makeSection(VisFrame,"  PERFORMANCE",3)
 makeToggle(VisFrame,"Optimizer + XRay",4,function(v) optimizerEnabled=v if v then enableOptimizer() else disableOptimizer() end end)
 
 -- SETTINGS TAB
-makeSection(SetFrame,"  SPEEDS",1)
-makeNumInput(SetFrame,"Normal Speed",NORMAL_SPEED,2,function(v) NORMAL_SPEED=v end)
-makeNumInput(SetFrame,"Slow Speed",SLOW_SPEED,3,function(v) SLOW_SPEED=v end)
-makeSection(SetFrame,"  STEAL",4)
-makeNumInput(SetFrame,"Steal Radius",STEAL_RADIUS,5,function(v) STEAL_RADIUS=math.clamp(v,5,200) end)
-makeNumInput(SetFrame,"Steal Duration",STEAL_DURATION,6,function(v) STEAL_DURATION=math.max(0.05,v) end)
-makeSection(SetFrame,"  GALAXY",7)
-makeNumInput(SetFrame,"Gravity %",GALAXY_GRAVITY,8,function(v) GALAXY_GRAVITY=v end)
-makeNumInput(SetFrame,"Hop Power",GALAXY_HOP,9,function(v) GALAXY_HOP=v end)
-makeNumInput(SetFrame,"Spin Speed",SPIN_SPEED,10,function(v) SPIN_SPEED=v if spinBAV then spinBAV.AngularVelocity=Vector3.new(0,SPIN_SPEED,0) end end)
-makeSection(SetFrame,"  CAMERA / BAT",11)
-makeNumInput(SetFrame,"FOV",fovValue,12,function(v) fovValue=v applyFOV() end)
-makeNumInput(SetFrame,"Aimbot Speed",AIMBOT_SPEED,13,function(v) AIMBOT_SPEED=v end)
-makeNumInput(SetFrame,"Engage Range",BAT_ENGAGE_RANGE,14,function(v) BAT_ENGAGE_RANGE=v end)
-makeSection(SetFrame,"  CONFIG",15)
+makeSection(SetFrame,"  UI SIZE",1)
 
 do
-    makeToggle(SetFrame,"Lock UI Position",15.5,function(v)
+    local uiSizeRow = Instance.new("Frame", SetFrame)
+    uiSizeRow.Size = UDim2.new(1,0,0,44)
+    uiSizeRow.BackgroundColor3 = CARD
+    uiSizeRow.BorderSizePixel = 0
+    uiSizeRow.LayoutOrder = 2
+    Instance.new("UICorner", uiSizeRow).CornerRadius = UDim.new(0,10)
+    
+    local uiSizeLbl = Instance.new("TextLabel", uiSizeRow)
+    uiSizeLbl.Size = UDim2.new(1,-70,1,0)
+    uiSizeLbl.Position = UDim2.new(0,14,0,0)
+    uiSizeLbl.BackgroundTransparency = 1
+    uiSizeLbl.Text = "UI Size"
+    uiSizeLbl.TextColor3 = WHITE
+    uiSizeLbl.Font = Enum.Font.GothamBold
+    uiSizeLbl.TextSize = 13
+    uiSizeLbl.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local sizeBox = Instance.new("TextBox", uiSizeRow)
+    sizeBox.Size = UDim2.new(0,68,0,28)
+    sizeBox.Position = UDim2.new(1,-78,0.5,-14)
+    sizeBox.BackgroundColor3 = Color3.fromRGB(20,18,32)
+    sizeBox.Text = tostring(currentUISize)
+    sizeBox.TextColor3 = ACCENT
+    sizeBox.Font = Enum.Font.GothamBold
+    sizeBox.TextSize = 13
+    sizeBox.TextXAlignment = Enum.TextXAlignment.Center
+    sizeBox.BorderSizePixel = 0
+    sizeBox.ClearTextOnFocus = false
+    Instance.new("UICorner", sizeBox).CornerRadius = UDim.new(0,6)
+    
+    local plusBtn = Instance.new("TextButton", uiSizeRow)
+    plusBtn.Size = UDim2.new(0,28,0,28)
+    plusBtn.Position = UDim2.new(1,-108,0.5,-14)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(30,20,50)
+    plusBtn.Text = "+"
+    plusBtn.Font = Enum.Font.GothamBold
+    plusBtn.TextSize = 14
+    plusBtn.TextColor3 = ACCENT
+    plusBtn.BorderSizePixel = 0
+    Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0,6)
+    
+    local minusBtn = Instance.new("TextButton", uiSizeRow)
+    minusBtn.Size = UDim2.new(0,28,0,28)
+    minusBtn.Position = UDim2.new(1,-138,0.5,-14)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(30,20,50)
+    minusBtn.Text = "-"
+    minusBtn.Font = Enum.Font.GothamBold
+    minusBtn.TextSize = 14
+    minusBtn.TextColor3 = ACCENT
+    minusBtn.BorderSizePixel = 0
+    Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0,6)
+    
+    plusBtn.MouseButton1Click:Connect(function()
+        updateUISize(currentUISize + 10)
+        sizeBox.Text = tostring(currentUISize)
+        saveConfig()
+    end)
+    
+    minusBtn.MouseButton1Click:Connect(function()
+        updateUISize(currentUISize - 10)
+        sizeBox.Text = tostring(currentUISize)
+        saveConfig()
+    end)
+    
+    sizeBox.FocusLost:Connect(function()
+        local n = tonumber(sizeBox.Text)
+        if n then
+            updateUISize(n)
+            sizeBox.Text = tostring(currentUISize)
+            saveConfig()
+        else
+            sizeBox.Text = tostring(currentUISize)
+        end
+    end)
+end
+
+makeSection(SetFrame,"  SPEEDS",3)
+makeNumInput(SetFrame,"Normal Speed",NORMAL_SPEED,4,function(v) NORMAL_SPEED=v end)
+makeNumInput(SetFrame,"Slow Speed",SLOW_SPEED,5,function(v) SLOW_SPEED=v end)
+makeSection(SetFrame,"  STEAL",6)
+makeNumInput(SetFrame,"Steal Radius",STEAL_RADIUS,7,function(v) STEAL_RADIUS=math.clamp(v,5,200) end)
+makeNumInput(SetFrame,"Steal Duration",STEAL_DURATION,8,function(v) STEAL_DURATION=math.max(0.05,v) end)
+makeSection(SetFrame,"  GALAXY",9)
+makeNumInput(SetFrame,"Gravity %",GALAXY_GRAVITY,10,function(v) GALAXY_GRAVITY=v end)
+makeNumInput(SetFrame,"Hop Power",GALAXY_HOP,11,function(v) GALAXY_HOP=v end)
+makeNumInput(SetFrame,"Spin Speed",SPIN_SPEED,12,function(v) SPIN_SPEED=v if spinBAV then spinBAV.AngularVelocity=Vector3.new(0,SPIN_SPEED,0) end end)
+makeSection(SetFrame,"  CAMERA / BAT",13)
+makeNumInput(SetFrame,"FOV",fovValue,14,function(v) fovValue=v applyFOV() end)
+makeNumInput(SetFrame,"Aimbot Speed",AIMBOT_SPEED,15,function(v) AIMBOT_SPEED=v end)
+makeNumInput(SetFrame,"Engage Range",BAT_ENGAGE_RANGE,16,function(v) BAT_ENGAGE_RANGE=v end)
+makeSection(SetFrame,"  CONFIG",17)
+
+do
+    makeToggle(SetFrame,"Lock UI Position",18,function(v)
         uiLocked=v
         for _,btn in ipairs(mobileButtons) do
             for _,ch in ipairs(btn:GetChildren()) do
@@ -1126,7 +1217,7 @@ do
     local saveBtn=Instance.new("TextButton",SetFrame)
     saveBtn.Size=UDim2.new(1,0,0,40) saveBtn.BackgroundColor3=Color3.fromRGB(20,60,30)
     saveBtn.Text="💾  SAVE CONFIG" saveBtn.Font=Enum.Font.GothamBlack saveBtn.TextSize=13
-    saveBtn.TextColor3=WHITE saveBtn.BorderSizePixel=0 saveBtn.LayoutOrder=16
+    saveBtn.TextColor3=WHITE saveBtn.BorderSizePixel=0 saveBtn.LayoutOrder=19
     Instance.new("UICorner",saveBtn).CornerRadius=UDim.new(0,10)
     saveBtn.MouseButton1Click:Connect(function()
         saveConfig() saveBtn.Text="✔ SAVED!" task.delay(1.5,function() saveBtn.Text="💾  SAVE CONFIG" end)
@@ -1291,7 +1382,6 @@ do
     end)
     makeMob("TP\nDOWN",col2,startY+gap*2,nil,function() task.spawn(doTPDown) end)
     
-    -- I-load ang mga na-save na positions pagkatapos gawin ang buttons
     task.defer(function()
         if mobilePosSaved and #mobilePosSaved >= #mobileButtons then
             for i, pos in ipairs(mobilePosSaved) do
@@ -1314,7 +1404,6 @@ do
     Instance.new("UICorner",OBtn).CornerRadius=UDim.new(0,14)
     local OS=Instance.new("UIStroke",OBtn) OS.Thickness=2 OS.Color=ACCENT OS.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
     
-    -- I-load ang na-save na position ng open button
     if openButtonPosSaved then
         OBtn.Position = UDim2.new(0, openButtonPosSaved.X, 0.5, openButtonPosSaved.Y)
     end
