@@ -44,10 +44,13 @@ gChar=nil gHum=nil gHrp=nil speedBB=nil
 ProgressBarFill=nil ProgressLabel=nil ProgressPctLabel=nil RadiusInput=nil
 animalCache={} promptCache={} stealCache={}
 toggleStates={} mobileButtons={} mobBtnRefs={}
+uiLocked=false
 AntiRagdollConns={}
 CONFIG_KEY="NexusHub_Config"
 changingKeybind=nil
 SavedToggleStates={}
+openButtonPosSaved=nil
+mobilePosSaved={}
 
 -- Ragdoll TP (Nightmare version)
 local tpWasRagdolled=false local tpCooldown=false
@@ -96,7 +99,16 @@ local function saveConfig()
                 GALAXY_GRAVITY=GALAXY_GRAVITY,GALAXY_HOP=GALAXY_HOP,
                 SPIN_SPEED=SPIN_SPEED,fovValue=fovValue,
                 AIMBOT_SPEED=AIMBOT_SPEED,BAT_ENGAGE_RANGE=BAT_ENGAGE_RANGE,
+                OpenButtonPosition = {X = OBtn and OBtn.Position.X.Offset or 10, Y = OBtn and OBtn.Position.Y.Offset or -26},
+                MobileButtonPositions = {}
             }
+            -- I-save mobile button positions
+            for i, btn in ipairs(mobileButtons) do
+                table.insert(data.MobileButtonPositions, {
+                    X = btn.Position.X.Offset,
+                    Y = btn.Position.Y.Offset
+                })
+            end
             for k,v in pairs(toggleStates) do data["TOGGLE_"..k]=v.state end
             for k,v in pairs(Keybinds) do data["KEY_"..k]=v.Name end
             writefile(CONFIG_KEY..".json",game:GetService("HttpService"):JSONEncode(data))
@@ -119,6 +131,8 @@ local function loadConfig()
                 if data.fovValue then fovValue=data.fovValue end
                 if data.AIMBOT_SPEED then AIMBOT_SPEED=data.AIMBOT_SPEED end
                 if data.BAT_ENGAGE_RANGE then BAT_ENGAGE_RANGE=data.BAT_ENGAGE_RANGE end
+                if data.OpenButtonPosition then openButtonPosSaved=data.OpenButtonPosition end
+                if data.MobileButtonPositions then mobilePosSaved=data.MobileButtonPositions end
                 for k,_ in pairs(Keybinds) do
                     if data["KEY_"..k] then pcall(function() Keybinds[k]=Enum.KeyCode[data["KEY_"..k]] end) end
                 end
@@ -819,7 +833,20 @@ local MainFrame=Instance.new("Frame")
 MainFrame.Name="MainFrame" MainFrame.Size=UDim2.new(0,360,0,580)
 MainFrame.Position=UDim2.new(0.5,-180,0.5,-290) MainFrame.BackgroundColor3=BG
 MainFrame.BorderSizePixel=0 MainFrame.Active=true MainFrame.Visible=false MainFrame.Parent=ScreenGui
+MainFrame.BackgroundTransparency=0.35
 Instance.new("UICorner",MainFrame).CornerRadius=UDim.new(0,16)
+local MainGrad=Instance.new("UIGradient",MainFrame)
+MainGrad.Color=ColorSequence.new({
+    ColorSequenceKeypoint.new(0,Color3.fromRGB(30,24,48)),
+    ColorSequenceKeypoint.new(0.5,Color3.fromRGB(14,12,24)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(20,16,38)),
+})
+MainGrad.Transparency=NumberSequence.new({
+    NumberSequenceKeypoint.new(0,0.25),
+    NumberSequenceKeypoint.new(0.5,0.1),
+    NumberSequenceKeypoint.new(1,0.3),
+})
+MainGrad.Rotation=135
 
 local MainStroke=Instance.new("UIStroke",MainFrame)
 MainStroke.Thickness=2 MainStroke.Color=ACCENT MainStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
@@ -864,11 +891,6 @@ do
         MainFrame.Size=UDim2.new(0,w,0,h) MainFrame.Position=UDim2.new(0.5,-w/2,0.5,-h/2)
     end)
 end
-
-local DiscordLbl=Instance.new("TextLabel",MainFrame)
-DiscordLbl.Size=UDim2.new(1,0,0,18) DiscordLbl.Position=UDim2.new(0,0,1,-22)
-DiscordLbl.BackgroundTransparency=1 DiscordLbl.Text="https://discord.gg/5FaWfEvmJ"
-DiscordLbl.Font=Enum.Font.GothamBold DiscordLbl.TextSize=11 DiscordLbl.TextColor3=ACCENT
 
 local TabContainer=Instance.new("Frame",MainFrame)
 TabContainer.Size=UDim2.new(1,-20,0,34) TabContainer.Position=UDim2.new(0,10,0,60) TabContainer.BackgroundTransparency=1
@@ -1087,6 +1109,20 @@ makeNumInput(SetFrame,"Engage Range",BAT_ENGAGE_RANGE,14,function(v) BAT_ENGAGE_
 makeSection(SetFrame,"  CONFIG",15)
 
 do
+    makeToggle(SetFrame,"Lock UI Position",15.5,function(v)
+        uiLocked=v
+        for _,btn in ipairs(mobileButtons) do
+            for _,ch in ipairs(btn:GetChildren()) do
+                if ch:IsA("UIStroke") then
+                    ch.Color=v and Color3.fromRGB(80,255,80) or ACCENT
+                    ch.Thickness=v and 2 or 1.5
+                end
+            end
+        end
+    end)
+end
+
+do
     local saveBtn=Instance.new("TextButton",SetFrame)
     saveBtn.Size=UDim2.new(1,0,0,40) saveBtn.BackgroundColor3=Color3.fromRGB(20,60,30)
     saveBtn.Text="💾  SAVE CONFIG" saveBtn.Font=Enum.Font.GothamBlack saveBtn.TextSize=13
@@ -1191,7 +1227,7 @@ do
     Instance.new("UICorner",ProgressBarFill).CornerRadius=UDim.new(1,0)
 end
 
--- MOBILE BUTTONS: Drop, Auto Left, Auto Bat, Auto Right, Slow Down, TP Down
+-- MOBILE BUTTONS
 do
     local gap=68 local startY=-170 local col1=-120 local col2=-56
     local function makeMob(label,xOffset,yOffset,toggleName,onAct)
@@ -1204,7 +1240,24 @@ do
         local s=Instance.new("UIStroke",btn) s.Color=ACCENT s.Thickness=1.5 s.Transparency=0.3
         table.insert(mobileButtons,btn)
         if toggleName then mobBtnRefs[toggleName]=btn end
-        btn.MouseButton1Click:Connect(onAct) return btn
+        local _drag,_dragStart,_startPos=false,nil,nil
+        btn.InputBegan:Connect(function(input)
+            if uiLocked then return end
+            if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
+                _drag=true _dragStart=input.Position _startPos=btn.Position
+                input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then _drag=false end end)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if _drag and not uiLocked and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
+                local d=input.Position-_dragStart
+                if d.Magnitude>6 then
+                    btn.Position=UDim2.new(_startPos.X.Scale,_startPos.X.Offset+d.X,_startPos.Y.Scale,_startPos.Y.Offset+d.Y)
+                end
+            end
+        end)
+        btn.MouseButton1Click:Connect(function() onAct() end)
+        return btn
     end
 
     makeMob("DROP",col1,startY+gap*0,nil,function() task.spawn(doDrop) end)
@@ -1237,6 +1290,17 @@ do
         slowDownEnabled=ns updateToggle("Slow Down",ns)
     end)
     makeMob("TP\nDOWN",col2,startY+gap*2,nil,function() task.spawn(doTPDown) end)
+    
+    -- I-load ang mga na-save na positions pagkatapos gawin ang buttons
+    task.defer(function()
+        if mobilePosSaved and #mobilePosSaved >= #mobileButtons then
+            for i, pos in ipairs(mobilePosSaved) do
+                if mobileButtons[i] then
+                    mobileButtons[i].Position = UDim2.new(1, pos.X, 0.5, pos.Y)
+                end
+            end
+        end
+    end)
 end
 
 -- OPEN/CLOSE BUTTON
@@ -1245,10 +1309,16 @@ do
     OCGui.Name="EclipseXOpenClose" OCGui.ResetOnSpawn=false OCGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
     local OBtn=Instance.new("TextButton",OCGui)
     OBtn.Size=UDim2.new(0,52,0,52) OBtn.Position=UDim2.new(0,10,0.5,-26)
-    OBtn.BackgroundColor3=Color3.fromRGB(10,8,18) OBtn.Text="👁 " OBtn.TextSize=26
+    OBtn.BackgroundColor3=Color3.fromRGB(10,8,18) OBtn.Text="≡" OBtn.TextSize=42
     OBtn.Font=Enum.Font.GothamBold OBtn.TextColor3=WHITE OBtn.BorderSizePixel=0 OBtn.Active=true
     Instance.new("UICorner",OBtn).CornerRadius=UDim.new(0,14)
     local OS=Instance.new("UIStroke",OBtn) OS.Thickness=2 OS.Color=ACCENT OS.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+    
+    -- I-load ang na-save na position ng open button
+    if openButtonPosSaved then
+        OBtn.Position = UDim2.new(0, openButtonPosSaved.X, 0.5, openButtonPosSaved.Y)
+    end
+    
     task.spawn(function()
         while OBtn and OBtn.Parent do
             for i=0,20 do OS.Thickness=2+i*0.05 task.wait(0.04) end
