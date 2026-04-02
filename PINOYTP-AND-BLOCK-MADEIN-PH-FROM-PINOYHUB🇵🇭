@@ -151,10 +151,24 @@ loadConfig()
 local function getHRP() local c=player.Character return c and c:FindFirstChild("HumanoidRootPart") end
 local function getHum() local c=player.Character return c and c:FindFirstChildOfClass("Humanoid") end
 
--- TP DOWN
+-- TP DOWN (improved - goes through ground to baseplate)
 local function doTPDown()
-    local r=getHRP() if not r then return end
-    r.CFrame=r.CFrame*CFrame.new(0,-20,0)
+    local char = player.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {char}
+    
+    local rayResult = workspace:Raycast(root.Position, Vector3.new(0, -500, 0), rayParams)
+    
+    local targetY = rayResult and (rayResult.Position.Y + 3) or (root.Position.Y - 50)
+    
+    root.CFrame = CFrame.new(root.Position.X, targetY, root.Position.Z)
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 end
 
 -- INF JUMP
@@ -1103,8 +1117,9 @@ makeToggle(VisFrame,"Player ESP",2,function(v) espEnabled=v if v then enableESP(
 makeSection(VisFrame,"  PERFORMANCE",3)
 makeToggle(VisFrame,"Optimizer + XRay",4,function(v) optimizerEnabled=v if v then enableOptimizer() else disableOptimizer() end end)
 
--- SETTINGS TAB
-makeSection(SetFrame,"  UI SIZE",1)
+-- SA SETTINGS TAB - ilagay ito sa pinakadulo ng SetFrame o kung saan mo gusto:
+
+makeSection(SetFrame, "  UI SIZE", 1)
 
 do
     local uiSizeRow = Instance.new("Frame", SetFrame)
@@ -1216,11 +1231,11 @@ end
 do
     local saveBtn=Instance.new("TextButton",SetFrame)
     saveBtn.Size=UDim2.new(1,0,0,40) saveBtn.BackgroundColor3=Color3.fromRGB(20,60,30)
-    saveBtn.Text="💾  SAVE CONFIG" saveBtn.Font=Enum.Font.GothamBlack saveBtn.TextSize=13
+    saveBtn.Text="SAVE CONFIG" saveBtn.Font=Enum.Font.GothamBlack saveBtn.TextSize=13
     saveBtn.TextColor3=WHITE saveBtn.BorderSizePixel=0 saveBtn.LayoutOrder=19
     Instance.new("UICorner",saveBtn).CornerRadius=UDim.new(0,10)
     saveBtn.MouseButton1Click:Connect(function()
-        saveConfig() saveBtn.Text="✔ SAVED!" task.delay(1.5,function() saveBtn.Text="💾  SAVE CONFIG" end)
+        saveConfig() saveBtn.Text="SAVED!" task.delay(1.5,function() saveBtn.Text="SAVE CONFIG" end)
     end)
 end
 
@@ -1273,50 +1288,107 @@ for idx,entry in ipairs(bindList) do
     end)
 end
 
+-- PROGRESS UI - MAY RD LANG (walang SD muna)
+local ProgressContainer = Instance.new("Frame", ScreenGui)
+ProgressContainer.Size = UDim2.new(0, 280, 0, 26)
+ProgressContainer.Position = UDim2.new(0.5, -140, 1, -45)
+ProgressContainer.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+ProgressContainer.BackgroundTransparency = 0.15
+Instance.new("UICorner", ProgressContainer).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", ProgressContainer).Color = ACCENT
+Instance.new("UIStroke", ProgressContainer).Thickness = 1
+
+-- DRAG
+local dragActive = false
+local dragStartPos, dragStartMouse = nil, nil
+ProgressContainer.InputBegan:Connect(function(input)
+    if uiLocked then return end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragActive = true
+        dragStartMouse = input.Position
+        dragStartPos = ProgressContainer.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragActive and not uiLocked and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStartMouse
+        ProgressContainer.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X,
+                                                dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragActive = false
+    end
+end)
+
+-- READY
+ProgressLabel = Instance.new("TextLabel", ProgressContainer)
+ProgressLabel.Size = UDim2.new(0, 50, 1, 0)
+ProgressLabel.Position = UDim2.new(0, 8, 0, 0)
+ProgressLabel.BackgroundTransparency = 1
+ProgressLabel.Text = "READY"
+ProgressLabel.TextColor3 = WHITE
+ProgressLabel.Font = Enum.Font.GothamBold
+ProgressLabel.TextSize = 10
+ProgressLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+-- PERCENTAGE
+ProgressPctLabel = Instance.new("TextLabel", ProgressContainer)
+ProgressPctLabel.Size = UDim2.new(0, 35, 1, 0)
+ProgressPctLabel.Position = UDim2.new(0, 58, 0, 0)
+ProgressPctLabel.BackgroundTransparency = 1
+ProgressPctLabel.Text = "0%"
+ProgressPctLabel.TextColor3 = ACCENT
+ProgressPctLabel.Font = Enum.Font.GothamBold
+ProgressPctLabel.TextSize = 10
+ProgressPctLabel.TextYAlignment = Enum.TextYAlignment.Center
+
 -- PROGRESS BAR
-do
-    local PBC=Instance.new("Frame",ScreenGui)
-    PBC.Size=UDim2.new(0,380,0,58) PBC.Position=UDim2.new(0.5,-190,1,-130)
-    PBC.BackgroundColor3=Color3.fromRGB(10,8,18) PBC.BackgroundTransparency=0.08 PBC.BorderSizePixel=0
-    Instance.new("UICorner",PBC).CornerRadius=UDim.new(0,14)
-    local pbs=Instance.new("UIStroke",PBC) pbs.Color=ACCENT pbs.Thickness=1.5
-    task.spawn(function()
-        local grad=Instance.new("UIGradient",pbs)
-        grad.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,ACCENT),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(30,20,50)),ColorSequenceKeypoint.new(1,ACCENT)})
-        local r=0 while PBC and PBC.Parent do r=(r+2)%360 grad.Rotation=r task.wait(0.02) end
-    end)
-    ProgressLabel=Instance.new("TextLabel",PBC)
-    ProgressLabel.Size=UDim2.new(0.45,0,0.5,0) ProgressLabel.Position=UDim2.new(0,12,0,4)
-    ProgressLabel.BackgroundTransparency=1 ProgressLabel.Text="READY" ProgressLabel.TextColor3=WHITE
-    ProgressLabel.Font=Enum.Font.GothamBold ProgressLabel.TextSize=13
-    ProgressLabel.TextXAlignment=Enum.TextXAlignment.Left ProgressLabel.ZIndex=3
-    ProgressPctLabel=Instance.new("TextLabel",PBC)
-    ProgressPctLabel.Size=UDim2.new(0.3,0,0.5,0) ProgressPctLabel.Position=UDim2.new(0.45,0,0,4)
-    ProgressPctLabel.BackgroundTransparency=1 ProgressPctLabel.Text="" ProgressPctLabel.TextColor3=ACCENT
-    ProgressPctLabel.Font=Enum.Font.GothamBlack ProgressPctLabel.TextSize=15
-    ProgressPctLabel.TextXAlignment=Enum.TextXAlignment.Center ProgressPctLabel.ZIndex=3
-    local rl=Instance.new("TextLabel",PBC)
-    rl.Size=UDim2.new(0,50,0,18) rl.Position=UDim2.new(1,-105,0,5) rl.BackgroundTransparency=1
-    rl.Text="Radius:" rl.TextColor3=Color3.fromRGB(180,180,200) rl.Font=Enum.Font.GothamBold rl.TextSize=11 rl.ZIndex=3
-    RadiusInput=Instance.new("TextBox",PBC)
-    RadiusInput.Size=UDim2.new(0,46,0,18) RadiusInput.Position=UDim2.new(1,-52,0,5)
-    RadiusInput.BackgroundTransparency=1 RadiusInput.Text=tostring(STEAL_RADIUS)
-    RadiusInput.TextColor3=ACCENT RadiusInput.Font=Enum.Font.GothamBold RadiusInput.TextSize=11
-    RadiusInput.ZIndex=3 RadiusInput.BorderSizePixel=0 RadiusInput.ClearTextOnFocus=false
-    RadiusInput.FocusLost:Connect(function()
-        local n=tonumber(RadiusInput.Text)
-        if n then STEAL_RADIUS=math.clamp(math.floor(n),5,200) RadiusInput.Text=tostring(STEAL_RADIUS) task.defer(saveConfig)
-        else RadiusInput.Text=tostring(STEAL_RADIUS) end
-    end)
-    local pt=Instance.new("Frame",PBC)
-    pt.Size=UDim2.new(0.92,0,0,14) pt.Position=UDim2.new(0.04,0,1,-22)
-    pt.BackgroundColor3=Color3.fromRGB(25,22,38) pt.BorderSizePixel=0 pt.ZIndex=2
-    Instance.new("UICorner",pt).CornerRadius=UDim.new(1,0)
-    ProgressBarFill=Instance.new("Frame",pt)
-    ProgressBarFill.Size=UDim2.new(0,0,1,0) ProgressBarFill.BackgroundColor3=ACCENT
-    ProgressBarFill.BorderSizePixel=0 ProgressBarFill.ZIndex=3
-    Instance.new("UICorner",ProgressBarFill).CornerRadius=UDim.new(1,0)
-end
+local barBg = Instance.new("Frame", ProgressContainer)
+barBg.Size = UDim2.new(0, 100, 0, 5)
+barBg.Position = UDim2.new(0, 96, 0.5, -2.5)
+barBg.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
+
+ProgressBarFill = Instance.new("Frame", barBg)
+ProgressBarFill.Size = UDim2.new(0, 0, 1, 0)
+ProgressBarFill.BackgroundColor3 = ACCENT
+Instance.new("UICorner", ProgressBarFill).CornerRadius = UDim.new(1, 0)
+
+-- RD LABEL
+local rdLbl = Instance.new("TextLabel", ProgressContainer)
+rdLbl.Size = UDim2.new(0, 22, 1, 0)
+rdLbl.Position = UDim2.new(1, -70, 0, 0)
+rdLbl.BackgroundTransparency = 1
+rdLbl.Text = "RD:"
+rdLbl.TextColor3 = Color3.fromRGB(170, 170, 200)
+rdLbl.Font = Enum.Font.GothamBold
+rdLbl.TextSize = 10
+rdLbl.TextYAlignment = Enum.TextYAlignment.Center
+
+-- RD INPUT
+RadiusInput = Instance.new("TextBox", ProgressContainer)
+RadiusInput.Size = UDim2.new(0, 35, 1, 0)
+RadiusInput.Position = UDim2.new(1, -48, 0, 0)
+RadiusInput.BackgroundTransparency = 1
+RadiusInput.Text = tostring(STEAL_RADIUS)
+RadiusInput.TextColor3 = ACCENT
+RadiusInput.Font = Enum.Font.GothamBold
+RadiusInput.TextSize = 10
+RadiusInput.TextYAlignment = Enum.TextYAlignment.Center
+RadiusInput.ClearTextOnFocus = false
+
+RadiusInput.FocusLost:Connect(function()
+    local n = tonumber(RadiusInput.Text)
+    if n then
+        STEAL_RADIUS = math.clamp(math.floor(n), 5, 200)
+        RadiusInput.Text = tostring(STEAL_RADIUS)
+        saveConfig()
+    else
+        RadiusInput.Text = tostring(STEAL_RADIUS)
+    end
+end)
 
 -- MOBILE BUTTONS
 do
@@ -1417,13 +1489,14 @@ do
     do
         local dragging,dragStart,startPos=false,nil,nil
         OBtn.InputBegan:Connect(function(input)
+            if uiLocked then return end
             if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
                 dragging=true dragStart=input.Position startPos=OBtn.Position
                 input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end)
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
+            if dragging and not uiLocked and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
                 local d=input.Position-dragStart
                 OBtn.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
             end
@@ -1520,4 +1593,124 @@ end)
 
 if espEnabled then enableESP() end
 applyFOV()
+
+-- Nexus Hub | FPS | Ping UI
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "NexusHub"
+gui.ResetOnSpawn = false
+gui.Parent = PlayerGui
+
+-- Main Frame (Black background, Red frame)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 280, 0, 32)
+frame.Position = UDim2.new(0.5, -140, 0, 10)
+frame.AnchorPoint = Vector2.new(0.5, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+frame.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = frame
+
+-- UIListLayout
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Center
+layout.Padding = UDim.new(0, 12)
+layout.Parent = frame
+
+local pad = Instance.new("UIPadding")
+pad.PaddingLeft = UDim.new(0, 15)
+pad.PaddingRight = UDim.new(0, 15)
+pad.Parent = frame
+
+-- Nexus Hub Label (Red)
+local nexusLabel = Instance.new("TextLabel")
+nexusLabel.Size = UDim2.new(0, 0, 1, 0)
+nexusLabel.AutomaticSize = Enum.AutomaticSize.X
+nexusLabel.BackgroundTransparency = 1
+nexusLabel.Text = "Nexus Hub"
+nexusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+nexusLabel.TextSize = 16
+nexusLabel.Font = Enum.Font.GothamBold
+nexusLabel.Parent = frame
+
+-- Separator
+local sep1 = Instance.new("TextLabel")
+sep1.Size = UDim2.new(0, 0, 1, 0)
+sep1.AutomaticSize = Enum.AutomaticSize.X
+sep1.BackgroundTransparency = 1
+sep1.Text = "|"
+sep1.TextColor3 = Color3.fromRGB(255, 0, 0)
+sep1.TextSize = 14
+sep1.Font = Enum.Font.GothamBold
+sep1.Parent = frame
+
+-- FPS Label (Red)
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(0, 0, 1, 0)
+fpsLabel.AutomaticSize = Enum.AutomaticSize.X
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: 0"
+fpsLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+fpsLabel.TextSize = 16
+fpsLabel.Font = Enum.Font.GothamBold
+fpsLabel.Parent = frame
+
+-- Separator
+local sep2 = Instance.new("TextLabel")
+sep2.Size = UDim2.new(0, 0, 1, 0)
+sep2.AutomaticSize = Enum.AutomaticSize.X
+sep2.BackgroundTransparency = 1
+sep2.Text = "|"
+sep2.TextColor3 = Color3.fromRGB(255, 0, 0)
+sep2.TextSize = 14
+sep2.Font = Enum.Font.GothamBold
+sep2.Parent = frame
+
+-- Ping Label (Red)
+local pingLabel = Instance.new("TextLabel")
+pingLabel.Size = UDim2.new(0, 0, 1, 0)
+pingLabel.AutomaticSize = Enum.AutomaticSize.X
+pingLabel.BackgroundTransparency = 1
+pingLabel.Text = "Ping: 0ms"
+pingLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+pingLabel.TextSize = 16
+pingLabel.Font = Enum.Font.GothamBold
+pingLabel.Parent = frame
+
+-- FPS Counter
+local frameCount = 0
+local lastTime = tick()
+
+RunService.RenderStepped:Connect(function()
+	frameCount = frameCount + 1
+	
+	local currentTime = tick()
+	if currentTime - lastTime >= 1 then
+		fpsLabel.Text = "FPS: " .. frameCount
+		frameCount = 0
+		lastTime = currentTime
+	end
+	
+	-- Ping Display
+	pcall(function()
+		local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+		pingLabel.Text = "Ping: " .. ping .. "ms"
+	end)
+end)
+
+print("Nexus Hub | FPS | Ping UI loaded - Centered Red Theme")
+
 print("Nexus Hub loaded — https://discord.gg/5FaWfEvmJ")
