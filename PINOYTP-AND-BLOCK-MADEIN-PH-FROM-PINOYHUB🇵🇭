@@ -45,6 +45,7 @@ ProgressBarFill=nil ProgressLabel=nil ProgressPctLabel=nil RadiusInput=nil
 animalCache={} promptCache={} stealCache={}
 toggleStates={} mobileButtons={} mobBtnRefs={}
 uiLocked=false
+OBtn=nil
 AntiRagdollConns={}
 CONFIG_KEY="NexusHub_Config"
 changingKeybind=nil
@@ -1239,6 +1240,38 @@ do
     end)
 end
 
+do
+    local resetBtn=Instance.new("TextButton",SetFrame)
+    resetBtn.Size=UDim2.new(1,0,0,40) resetBtn.BackgroundColor3=Color3.fromRGB(50,20,20)
+    resetBtn.Text="⟳  RESET UI POSITION" resetBtn.Font=Enum.Font.GothamBlack resetBtn.TextSize=13
+    resetBtn.TextColor3=WHITE resetBtn.BorderSizePixel=0 resetBtn.LayoutOrder=20
+    Instance.new("UICorner",resetBtn).CornerRadius=UDim.new(0,10)
+    Instance.new("UIStroke",resetBtn).Color=ACCENT
+    resetBtn.MouseButton1Click:Connect(function()
+        -- Reset mobile buttons
+        local gap=68 local startY=-170 local col1=-120 local col2=-56
+        local defaults={
+            UDim2.new(1,col1,0.5,startY+gap*0),
+            UDim2.new(1,col2,0.5,startY+gap*0),
+            UDim2.new(1,col1,0.5,startY+gap*1),
+            UDim2.new(1,col2,0.5,startY+gap*1),
+            UDim2.new(1,col1,0.5,startY+gap*2),
+            UDim2.new(1,col2,0.5,startY+gap*2),
+        }
+        for i,btn in ipairs(mobileButtons) do
+            if defaults[i] then btn.Position=defaults[i] end
+        end
+        -- Reset menu icon (OBtn)
+        if OBtn then OBtn.Position=UDim2.new(0,10,0.5,-26) end
+        -- Reset steal progress bar
+        if ProgressContainer then ProgressContainer.Position=UDim2.new(0.5,-140,1,-45) end
+        -- Reset main frame
+        local w=MainFrame.Size.X.Offset local h=MainFrame.Size.Y.Offset
+        MainFrame.Position=UDim2.new(0.5,-w/2,0.5,-h/2)
+        resetBtn.Text="RESET!" task.delay(1.5,function() resetBtn.Text="⟳  RESET UI POSITION" end)
+    end)
+end
+
 -- BINDS TAB
 makeSection(BindFrame,"  KEYBINDS (click to rebind)",1)
 do
@@ -1469,7 +1502,7 @@ end
 do
     local OCGui=Instance.new("ScreenGui",player:WaitForChild("PlayerGui"))
     OCGui.Name="EclipseXOpenClose" OCGui.ResetOnSpawn=false OCGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-    local OBtn=Instance.new("TextButton",OCGui)
+    OBtn=Instance.new("TextButton",OCGui)
     OBtn.Size=UDim2.new(0,52,0,52) OBtn.Position=UDim2.new(0,10,0.5,-26)
     OBtn.BackgroundColor3=Color3.fromRGB(10,8,18) OBtn.Text="≡" OBtn.TextSize=42
     OBtn.Font=Enum.Font.GothamBold OBtn.TextColor3=WHITE OBtn.BorderSizePixel=0 OBtn.Active=true
@@ -1594,123 +1627,192 @@ end)
 if espEnabled then enableESP() end
 applyFOV()
 
--- Nexus Hub | FPS | Ping UI
+-- NEXUS HUB - FPS & PING DISPLAY (hindi nadradrag)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
+local ACCENT = Color3.fromRGB(220,30,30)
+local WHITE = Color3.fromRGB(240,240,255)
+
+-- ===== FLYING DEMON EMOJI =====
+local function spawnFlyingDemon()
+    local demon = Instance.new("TextLabel")
+    demon.Size = UDim2.new(0, 50, 0, 50)
+    demon.Position = UDim2.new(0.5, -25, 0, -50)
+    demon.BackgroundTransparency = 1
+    demon.Text = "👹"
+    demon.TextSize = 45
+    demon.TextColor3 = ACCENT
+    demon.Font = Enum.Font.GothamBold
+    demon.ZIndex = 999
+    demon.Parent = game:GetService("CoreGui")
+    
+    local startY = -50
+    local endY = 600
+    local duration = 1.2
+    local startTime = tick()
+    
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        local elapsed = tick() - startTime
+        local alpha = math.min(1, elapsed / duration)
+        
+        local y = startY + (endY - startY) * alpha
+        demon.Position = UDim2.new(0.5, -25, 0, y)
+        demon.TextTransparency = alpha * 0.8
+        
+        if alpha >= 1 then
+            demon:Destroy()
+            connection:Disconnect()
+        end
+    end)
+end
+
+-- Spawn 3 demons on execute
+for i = 1, 3 do
+    task.spawn(function()
+        task.wait(i * 0.15)
+        spawnFlyingDemon()
+    end)
+end
+
 -- Create ScreenGui
 local gui = Instance.new("ScreenGui")
-gui.Name = "NexusHub"
+gui.Name = "NexusFPS_Ping"
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
--- Main Frame (Black background, Red frame)
+-- Main Frame (naka-center sa taas, HINDI nadradrag)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 32)
-frame.Position = UDim2.new(0.5, -140, 0, 10)
-frame.AnchorPoint = Vector2.new(0.5, 0)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-frame.BackgroundTransparency = 0
-frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+frame.Size = UDim2.new(0, 250, 0, 32)
+frame.Position = UDim2.new(0.5, -125, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+frame.BackgroundTransparency = 0.15
+frame.BorderSizePixel = 0
 frame.Parent = gui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 6)
+corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
--- UIListLayout
-local layout = Instance.new("UIListLayout")
-layout.FillDirection = Enum.FillDirection.Horizontal
-layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.VerticalAlignment = Enum.VerticalAlignment.Center
-layout.Padding = UDim.new(0, 12)
-layout.Parent = frame
+-- Red Frame
+local redFrame = Instance.new("UIStroke")
+redFrame.Color = ACCENT
+redFrame.Thickness = 2
+redFrame.Parent = frame
 
-local pad = Instance.new("UIPadding")
-pad.PaddingLeft = UDim.new(0, 15)
-pad.PaddingRight = UDim.new(0, 15)
-pad.Parent = frame
+task.spawn(function()
+    while frame and frame.Parent do
+        for i = 0, 10 do
+            redFrame.Thickness = 2 + i * 0.1
+            task.wait(0.03)
+        end
+        for i = 0, 10 do
+            redFrame.Thickness = 3 - i * 0.1
+            task.wait(0.03)
+        end
+    end
+end)
 
--- Nexus Hub Label (Red)
-local nexusLabel = Instance.new("TextLabel")
-nexusLabel.Size = UDim2.new(0, 0, 1, 0)
-nexusLabel.AutomaticSize = Enum.AutomaticSize.X
-nexusLabel.BackgroundTransparency = 1
-nexusLabel.Text = "Nexus Hub"
-nexusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-nexusLabel.TextSize = 16
-nexusLabel.Font = Enum.Font.GothamBold
-nexusLabel.Parent = frame
+-- Gradient
+local grad = Instance.new("UIGradient")
+grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30,24,48)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,12,24)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20,16,38))
+})
+grad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.25),
+    NumberSequenceKeypoint.new(0.5, 0.1),
+    NumberSequenceKeypoint.new(1, 0.3)
+})
+grad.Rotation = 135
+grad.Parent = frame
 
--- Separator
-local sep1 = Instance.new("TextLabel")
-sep1.Size = UDim2.new(0, 0, 1, 0)
-sep1.AutomaticSize = Enum.AutomaticSize.X
-sep1.BackgroundTransparency = 1
-sep1.Text = "|"
-sep1.TextColor3 = Color3.fromRGB(255, 0, 0)
-sep1.TextSize = 14
-sep1.Font = Enum.Font.GothamBold
-sep1.Parent = frame
-
--- FPS Label (Red)
-local fpsLabel = Instance.new("TextLabel")
-fpsLabel.Size = UDim2.new(0, 0, 1, 0)
-fpsLabel.AutomaticSize = Enum.AutomaticSize.X
-fpsLabel.BackgroundTransparency = 1
-fpsLabel.Text = "FPS: 0"
-fpsLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-fpsLabel.TextSize = 16
-fpsLabel.Font = Enum.Font.GothamBold
-fpsLabel.Parent = frame
-
--- Separator
-local sep2 = Instance.new("TextLabel")
-sep2.Size = UDim2.new(0, 0, 1, 0)
-sep2.AutomaticSize = Enum.AutomaticSize.X
-sep2.BackgroundTransparency = 1
-sep2.Text = "|"
-sep2.TextColor3 = Color3.fromRGB(255, 0, 0)
-sep2.TextSize = 14
-sep2.Font = Enum.Font.GothamBold
-sep2.Parent = frame
-
--- Ping Label (Red)
-local pingLabel = Instance.new("TextLabel")
-pingLabel.Size = UDim2.new(0, 0, 1, 0)
-pingLabel.AutomaticSize = Enum.AutomaticSize.X
-pingLabel.BackgroundTransparency = 1
-pingLabel.Text = "Ping: 0ms"
-pingLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-pingLabel.TextSize = 16
-pingLabel.Font = Enum.Font.GothamBold
-pingLabel.Parent = frame
+-- Title
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 1, 0)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Nexus Hub | FPS: 0 | Ping: 0ms"
+titleLabel.TextColor3 = WHITE
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+titleLabel.Parent = frame
 
 -- FPS Counter
 local frameCount = 0
 local lastTime = tick()
 
 RunService.RenderStepped:Connect(function()
-	frameCount = frameCount + 1
-	
-	local currentTime = tick()
-	if currentTime - lastTime >= 1 then
-		fpsLabel.Text = "FPS: " .. frameCount
-		frameCount = 0
-		lastTime = currentTime
-	end
-	
-	-- Ping Display
-	pcall(function()
-		local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-		pingLabel.Text = "Ping: " .. ping .. "ms"
-	end)
+    frameCount = frameCount + 1
+    
+    local currentTime = tick()
+    if currentTime - lastTime >= 1 then
+        local fps = frameCount
+        local ping = 0
+        
+        pcall(function()
+            ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        
+        titleLabel.Text = "Nexus Hub | FPS: " .. fps .. " | Ping: " .. ping .. "ms"
+        
+        if fps >= 60 then
+            titleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        elseif fps >= 30 then
+            titleLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+        else
+            titleLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+        end
+        
+        frameCount = 0
+        lastTime = currentTime
+    end
 end)
 
-print("Nexus Hub | FPS | Ping UI loaded - Centered Red Theme")
+print("Nexus Hub FPS & Ping Display loaded! 👹👹👹 (fixed position, cannot drag)")
+
+-- Text sa Head (Billboard GUI)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
+
+-- Wait for character
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Head = Character:WaitForChild("Head")
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "HeadText"
+gui.ResetOnSpawn = false
+gui.Parent = PlayerGui
+
+-- BillboardGui (lalabas sa head)
+local billboard = Instance.new("BillboardGui")
+billboard.Name = "HeadBillboard"
+billboard.Adornee = Head
+billboard.Size = UDim2.new(0, 200, 0, 50)
+billboard.StudsOffset = Vector3.new(0, 2, 0)
+billboard.AlwaysOnTop = true
+billboard.Parent = gui
+
+-- Text Label
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(1, 0, 1, 0)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "discord.gg/rNGuYQnjDy"
+textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+textLabel.TextSize = 18
+textLabel.Font = Enum.Font.GothamBold
+textLabel.TextStrokeTransparency = 0.3
+textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+textLabel.Parent = billboard
+
+print("Text sa head mo ay lumabas na!")
 
 print("Nexus Hub loaded — https://discord.gg/5FaWfEvmJ")
